@@ -7,7 +7,6 @@ from app.repositories import closes as close_repo
 from app.repositories import lines as line_repo
 from app.repositories import reversals as reversal_repo
 from app.repositories import settings as settings_repo
-from app import reversal_view
 from app import align_23 as align_mod
 
 
@@ -37,7 +36,9 @@ def create_line(body: dict[str, Any]) -> dict[str, Any]:
         day = body.get("business_day") or settings_repo.get(conn, "business_day")
         if not day:
             raise HTTPException(400, "未设置营业日")
-        if close_repo.is_sealed(conn, day) and not reversal_view.allow_reversal_into_sealed(conn, close_repo, day):
+        # 写闸：已 sealed 分区拒绝一切新写入（含冲正以外的任何流水），
+        # 分区净额一旦钉扎，只允许通过封账批次读取，绝不被后续写入静默改写
+        if close_repo.is_sealed(conn, day):
             raise HTTPException(409, f"营业日 {day} 已封账，禁止新增流水")
         amount = float(body["amount"])
         # 负向流水只能由冲正入口产生，普通登记不得直接写负数

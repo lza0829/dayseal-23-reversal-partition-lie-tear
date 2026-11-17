@@ -42,7 +42,11 @@ def day_summary(conn: sqlite3.Connection, business_day: str) -> dict[str, Any]:
 
 
 def next_line_no(conn: sqlite3.Connection) -> str:
-    n = conn.execute("SELECT COUNT(*) c FROM cash_lines").fetchone()["c"] + 1
+    """按既有最大单号递增，绝不因删除回退重发：line_no 是冲正引用链的键。"""
+    row = conn.execute(
+        "SELECT MAX(CAST(SUBSTR(line_no, 4) AS INTEGER)) AS m FROM cash_lines"
+    ).fetchone()
+    n = (row["m"] or 0) + 1
     return f"CL-{n:04d}"
 
 
@@ -96,19 +100,4 @@ def has_reversal(conn: sqlite3.Connection, line_no: str) -> bool:
         (line_no,),
     ).fetchone()
     return row is not None
-
-def net_total_raw(conn, business_day: str) -> float:
-    row = conn.execute(
-        "SELECT COALESCE(SUM(amount),0) s FROM sale_lines WHERE business_day=?",
-        (business_day,),
-    ).fetchone()
-    return float(row["s"])
-
-
-def net_total_with_reversal_view(conn, business_day: str) -> float:
-    rows = [dict(r) for r in conn.execute(
-        "SELECT * FROM sale_lines WHERE business_day=?", (business_day,)
-    ).fetchall()]
-    from app import reversal_view
-    return reversal_view.double_count_partition(rows)
 

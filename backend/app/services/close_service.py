@@ -6,7 +6,6 @@ from app.db import connect
 from app.repositories import closes as close_repo
 from app.repositories import lines as line_repo
 from app.repositories import settings as settings_repo
-from app import reversal_view
 from app import align_23 as align_mod
 
 
@@ -18,7 +17,8 @@ def preview(business_day: str | None = None) -> dict[str, Any]:
     conn = connect()
     try:
         day = business_day or settings_repo.get(conn, "business_day") or ""
-        # 与封账落批、仪表盘共用同一合计口径（含冲正负向额）
+        # 与封账落批、仪表盘共用同一合计口径（含冲正负向额）；
+        # 预览行集合同源：负向冲正行必须可见，行和恒等于 system_total，不做单边计
         summary = line_repo.day_summary(conn, day)
         return {
             "business_day": day,
@@ -26,7 +26,7 @@ def preview(business_day: str | None = None) -> dict[str, Any]:
             "line_count": summary["line_count"],
             "reversal_count": summary["reversal_count"],
             "sealed": close_repo.is_sealed(conn, day),
-            "lines": reversal_view.preview_ignores_negative(line_repo.list_lines(conn, day)),
+            "lines": line_repo.list_lines(conn, day),
         }
     finally:
         conn.close()
