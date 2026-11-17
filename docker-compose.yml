@@ -1,0 +1,13 @@
+services:
+  api:
+    build: ./backend
+    ports: ["10700:10700"]
+    volumes:
+      - dayseal-data:/data
+  web:
+    build: ./frontend
+    ports: ["5700:80"]
+    depends_on: [api]
+
+volumes:
+  dayseal-data:
